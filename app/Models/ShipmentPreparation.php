@@ -1,0 +1,587 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
+
+
+class ShipmentPreparation extends Model
+{
+    use HasFactory;
+
+    public static function get_transaction_list($search, $status_id)
+    {
+        date_default_timezone_set('Asia/Jakarta');
+        $start_date = date('Y-m-d', strtotime('-15 days'));
+        $end_date = date('Y-m-d', strtotime('+2 day'));
+        $result = DB::connection('sqlsrv4')->table('ShipHead')->where('ReadyToInvoice', 0);
+        if (!empty($search)) {
+            $result = $result->where(function ($query) use ($search) {
+                $query->where('LegalNumber', 'LIKE', "%$search%")
+                    ->orWhere('PackNum', 'LIKE', "%$search%");
+            });
+        } else {
+            $result = $result->whereBetween('ShipDate', [$start_date, $end_date]);
+        }
+        if ($status_id == 1) {
+            $result = $result->where(function ($query) {
+                $query->where('ReadyToPrint_c', '=', 0);
+            });
+        } else if ($status_id == 2) {
+            $result = $result->where(function ($query) {
+                $query->where('ReadyToPrint_c', '=', 1);
+            });
+        }
+        $result = $result->select('LegalNumber', 'PackNum', 'ShipDate', 'EntryPerson', 'ReadyToInvoice', 'ReadyToPrint_c');
+        return $result;
+    }
+
+    public static function check_so_number($OrderNum, $PackNum)
+    {
+        $ship_db =  DB::connection('sqlsrv4')->table('ShipHead')->where('PackNum', $PackNum)->get();
+        if ($ship_db->count() > 0) {
+            foreach ($ship_db as $row) {
+                $CustNum = $row->CustNum;
+            }
+        } else {
+            $CustNum = 0;
+        }
+
+        $result = DB::connection('sqlsrv4')->table('OrderHed')->where('OrderNum', $OrderNum);
+        // if ($CustNum > 0) {
+        //     $result = $result->where('CustNum', $CustNum)  ; 
+        // } 
+        $result = $result->count();
+
+        return $result;
+    }
+
+    public static function check_total_order_line_by_cust_label($OrderNum, $PartNum, $ext_label)
+    {
+        $db_ext_label = DB::connection('sqlsrv6')->table('PCCard as a')
+            ->where('SlipNo', "$ext_label")
+            ->get();
+
+        if ($db_ext_label->count() > 0) {
+            foreach ($db_ext_label as $row) {
+                $SlipNo = $row->SlipNo;
+            }
+        } else {
+            $SlipNo = '';
+        }
+
+        $result = DB::connection('sqlsrv5')->table('OrderHed as a')
+            ->join('Erp.OrderDtl as b', function ($join) {
+                $join->on('a.Company', '=', 'b.Company')
+                    ->on('a.OrderNum', '=', 'b.OrderNum');
+            })
+            ->join('Erp.OrderRel as c', function ($join) {
+                $join->on('b.Company', '=', 'c.Company')
+                    ->on('b.OrderNum', '=', 'c.OrderNum')
+                    ->on('b.OrderLine', '=', 'c.OrderLine');
+            })
+            ->select('c.OrderNum', 'a.PONum', 'c.OrderLine', 'c.OrderRelNum', 'b.PartNum', 'b.LineDesc', 'c.SellingReqQty')
+            ->where('b.PartNum', '=', "$PartNum")
+            ->where('a.OrderNum', '=', $OrderNum)
+            ->where('c.DemandReference', '=', $SlipNo);
+
+        return $result;
+    }
+    public static function get_order_line_MMKI($OrderNum, $PartNum,$ext_label)
+    {
+       $cust_num = self::get_cust_num($OrderNum);
+        if(strpos($PartNum,'-RX') !== false){
+            $PartNum = explode('-', $PartNum)[0];
+        }
+        if ($cust_num == 3 || $cust_num == 6)// || $cust_num == 9) // MMKI & SIM CustNum
+        {
+            $result = DB::connection('sqlsrv4')->table('OrderHed as a')
+            ->join('Erp.OrderDtl as b', function ($join) {
+                $join->on('a.Company', '=', 'b.Company')
+                    ->on('a.OrderNum', '=', 'b.OrderNum');
+            })
+            ->join('Erp.OrderRel as c', function ($join) {
+                $join->on('b.Company', '=', 'c.Company')
+                    ->on('b.OrderNum', '=', 'c.OrderNum')
+                    ->on('b.OrderLine', '=', 'c.OrderLine');
+            })
+            ->select('c.OrderNum', 'a.PONum', 'c.OrderLine', 'c.OrderRelNum', 'b.PartNum', 'b.LineDesc', 'c.SellingReqQty')
+            ->where('b.PartNum', "$PartNum")
+            ->where('a.OrderNum', $OrderNum)
+            // ->where('c.DemandReference', "$ext_label")
+            // ->limit(1)
+            ->get();
+                return $result;
+        }else{
+        $result = DB::connection('sqlsrv4')->table('OrderHed as a')
+            ->join('Erp.OrderDtl as b', function ($join) {
+                $join->on('a.Company', '=', 'b.Company')
+                    ->on('a.OrderNum', '=', 'b.OrderNum');
+            })
+            ->join('Erp.OrderRel as c', function ($join) {
+                $join->on('b.Company', '=', 'c.Company')
+                    ->on('b.OrderNum', '=', 'c.OrderNum')
+                    ->on('b.OrderLine', '=', 'c.OrderLine');
+            })
+            ->select('c.OrderNum', 'a.PONum', 'c.OrderLine', 'c.OrderRelNum', 'b.PartNum', 'b.LineDesc', 'c.SellingReqQty')
+            ->where('b.PartNum', '=', "$PartNum")
+            ->where('a.OrderNum', '=', $OrderNum)
+            ->get();
+        }
+        return $result;
+    }
+   
+    public static function get_order_line($OrderNum, $PartNum)
+    {
+        if(strpos($PartNum,'-RX') !== false){
+            $PartNum = explode('-', $PartNum)[0];
+        }
+        $result = DB::connection('sqlsrv4')->table('OrderHed as a')
+            ->join('Erp.OrderDtl as b', function ($join) {
+                $join->on('a.Company', '=', 'b.Company')
+                    ->on('a.OrderNum', '=', 'b.OrderNum');
+            })
+            ->join('Erp.OrderRel as c', function ($join) {
+                $join->on('b.Company', '=', 'c.Company')
+                    ->on('b.OrderNum', '=', 'c.OrderNum')
+                    ->on('b.OrderLine', '=', 'c.OrderLine');
+            })->join('Erp.Warehse as d', function ($join) {
+                $join->on('c.WarehouseCode', '=', 'd.WarehouseCode');
+            })
+            ->select('c.OrderNum', 'a.PONum', 'c.OrderLine', 'c.OrderRelNum', 'b.PartNum', 'b.LineDesc', 'c.SellingReqQty','c.WarehouseCode','d.Description as WarehouseDesc')
+            ->where('b.PartNum', '=', "$PartNum")
+            ->where('a.OrderNum', '=', $OrderNum)
+            ->get();
+
+        return $result;
+    }
+
+    public static function get_detail_release_transaction_list($search, $PackNum, $PackLine)
+    {
+        $result = DB::table('t500_ShipDtl')
+            ->where('PackNum', '=', $PackNum)
+            ->where('PackLine', '=', $PackLine);
+
+
+        if (!empty($search)) {
+            $result = $result->where(function ($query) use ($search) {
+                $query->where('PackNum', 'LIKE', "%$search%")
+                    ->orWhere('PackLine', 'LIKE', "%$search%")
+                    ->orWhere('LotNum', 'LIKE', "%$search%");
+            });
+        }
+
+        return $result;
+    }
+
+    public static function get_qty_before($packNum, $pack_line)
+    {
+        $db = DB::connection('sqlsrv4')->table('Erp.ShipDtl')
+            ->where('PackNum', $packNum)
+            ->where('PackLine', $pack_line)
+            ->get();
+        if ($db->count() > 0) {
+            foreach ($db as $row) {
+                $qty = $row->OurInventoryShipQty;
+            }
+        } else {
+            $qty = 0;
+        }
+        return $qty;
+    }
+
+    public static function get_qty_lot($sysID)
+    {
+        $db = DB::table('t500_ShipDtl')
+            ->where('SysID', $sysID)
+            ->get();
+        if ($db->count() > 0) {
+            foreach ($db as $row) {
+                $qty = $row->Qty;
+            }
+        } else {
+            $qty = 0;
+        }
+        return $qty;
+    }
+
+    public static function get_detail_transaction_list($search, $PackNum)
+    {
+        $result = DB::connection('sqlsrv4')->table('Erp.ShipDtl')->where('PackNum', $PackNum);
+        if (!empty($search)) {
+            $result = $result->where(function ($query) use ($search) {
+                $query->where('PartNum', 'LIKE', "%$search%");
+            });
+        }
+        $result = $result->select('PackNum', 'PackLine', 'OrderNum', 'OrderLine', 'OrderRelNum', 'PartNum', 'LineDesc', 'IUM', 'WUM', 'LotNum', 'SellingInventoryShipQty', 'OurInventoryShipQty');
+        return $result;
+    }
+
+    public static function get_pack_line($PackNum, $OrderNum, $OrderLine, $orderRel, $LotNum)
+    {
+        $db = DB::connection('sqlsrv4')->table('Erp.ShipDtl')
+            ->where('PackNum', $PackNum)
+            ->where('OrderNum', $OrderNum)
+            ->where('OrderLine', $OrderLine)
+            ->where('OrderRelNum', $orderRel)
+            ->where('LotNum', $LotNum)
+            ->get();
+        if ($db->count() > 0) {
+            foreach ($db as $row) {
+                $PackLIne = $row->PackLine;
+            }
+        } else {
+            $PackLIne = 0;
+        }
+
+        return $PackLIne;
+    }
+
+    public static function insert_record_pallet_with_pack_line($packNum, $orderNum, $orderLine, $orderRel, $partNum, $lotNum, $lineDesc, $displayInvQty, $poNum, $pack_line, $ext_label)
+    {
+        $lineDesc = str_replace("__", ",", $lineDesc);
+        $username = Auth::user()->username;
+        $db = DB::table('t500_ShipDtl')
+            ->insert([
+                'PackNum' => $packNum,
+                'PackLine' => $pack_line,
+                'OrderNum' => $orderNum,
+                'OrderLine' => $orderLine,
+                'OrderRelNum' => $orderRel,
+                'PartNum' => "$partNum",
+                'LotNum' => $lotNum,
+                'LineDesc' => "$lineDesc",
+                'Qty' => $displayInvQty,
+                'poNum' => "$poNum",
+                'DemandReference' => "$ext_label",
+                'ScanBy' => "$username"
+            ]);
+        return $db;
+    }
+    public static function delete_record_lot($sysID)
+    {
+        $db = DB::table('t500_ShipDtl')
+            ->where('SysID', $sysID)
+            ->delete();
+        return $db;
+    }
+
+    public static function destroy_record_lot($packNum)
+    {
+        $db = DB::table('t500_ShipDtl')
+            ->where('PackNum', $packNum)
+            ->delete();
+        return $db;
+    }
+
+    public static function get_prop_lot($sysID)
+    {
+        $db = DB::table('t500_ShipDtl')
+            ->where('SysID', $sysID)
+            ->get();
+        return $db;
+    }
+
+    public static function insert_record_pallet($packNum, $orderNum, $orderLine, $orderRel, $partNum, $lotNum, $lineDesc, $displayInvQty, $poNum, $ext_label)
+    {
+        $pack_line = self::get_pack_line($packNum, $orderNum, $orderLine, $orderRel, $lotNum);
+        $lineDesc = str_replace("__", ",", $lineDesc);
+        $username = Auth::user()->username;
+        $db = DB::table('t500_ShipDtl')
+            ->insert([
+                'PackNum' => $packNum,
+                'PackLine' => $pack_line,
+                'OrderNum' => $orderNum,
+                'OrderLine' => $orderLine,
+                'OrderRelNum' => $orderRel,
+                'PartNum' => "$partNum",
+                'LotNum' => $lotNum,
+                'LineDesc' => "$lineDesc",
+                'Qty' => $displayInvQty,
+                'poNum' => "$poNum",
+                'DemandReference' => "$ext_label",
+                'ScanBy' => "$username"
+            ]);
+        return $db;
+    }
+
+    public static function get_cust_num($OrderNum)
+    {
+        $db = DB::connection('sqlsrv4')->table('OrderHed as a')
+            ->where('a.OrderNum', $OrderNum)->get();
+        $result = 0;
+        if ($db) {
+            foreach ($db as $row) {
+                $result = $row->CustNum;
+            }
+        }
+        return $result;
+    }
+
+    public static function get_order_line_by_slip_no($OrderNum, $PartNum, $ext_label)
+    {
+        $cust_num = self::get_cust_num($OrderNum);
+        
+        if ($cust_num == 3) // MMKI CustNum
+        {
+            if(strpos($PartNum,"_") === false){
+                    $saiexp = str_replace(".", "", str_replace(" ", "", $PartNum));
+                }else if(strpos($PartNum,".") === false){
+                    $saiexp = str_replace("_", "", str_replace(" ", "", $PartNum));
+                }
+                if (strpos($PartNum, "-") !== false) {
+                    $saiexp = explode('-', $PartNum)[0];
+                }
+           if ($saiexp != $ext_label){
+             $error_from = "SHP";
+                $error_type = "LABEL";
+                $description = "Label part customer ".$ext_label." tidak sesuai dengan label part SAI ". $PartNum ;
+                
+                $error_update = ErrorLogs::logError($error_from, $error_type, $description,0,$OrderNum,$PartNum);
+                return [];
+            }else{
+                    if(strpos($PartNum,'-RX') !== false){
+                        $PartNum = explode('-', $PartNum)[0];
+                    }
+
+            $result = DB::connection('sqlsrv4')->table('OrderHed as a')
+            ->join('Erp.OrderDtl as b', function ($join) {
+                $join->on('a.Company', '=', 'b.Company')
+                    ->on('a.OrderNum', '=', 'b.OrderNum');
+            })
+            ->join('Erp.OrderRel as c', function ($join) {
+                $join->on('b.Company', '=', 'c.Company')
+                    ->on('b.OrderNum', '=', 'c.OrderNum')
+                    ->on('b.OrderLine', '=', 'c.OrderLine');
+            })
+            ->select('c.OrderNum', 'a.PONum', 'c.OrderLine', 'c.OrderRelNum', 'b.PartNum', 'b.LineDesc', 'c.SellingReqQty')
+            ->where('b.PartNum', "$PartNum")
+            ->where('a.OrderNum', $OrderNum)
+            // ->where('c.DemandReference', "$ext_label")
+            ->limit(1)
+            ->get();
+                return $result;
+            }
+        }
+        $result = DB::connection('sqlsrv4')->table('OrderHed as a')
+            ->join('Erp.OrderDtl as b', function ($join) {
+                $join->on('a.Company', '=', 'b.Company')
+                    ->on('a.OrderNum', '=', 'b.OrderNum');
+            })
+            ->join('Erp.OrderRel as c', function ($join) {
+                $join->on('b.Company', '=', 'c.Company')
+                    ->on('b.OrderNum', '=', 'c.OrderNum')
+                    ->on('b.OrderLine', '=', 'c.OrderLine');
+            })
+            ->select('c.OrderNum', 'a.PONum', 'c.OrderLine', 'c.OrderRelNum', 'b.PartNum', 'b.LineDesc', 'c.SellingReqQty')
+            ->where('b.PartNum', "$PartNum")
+            ->where('a.OrderNum', $OrderNum)
+            ->where('c.DemandReference', "$ext_label")
+            ->limit(1)
+            ->get();
+        return $result;
+    }   
+
+
+    public static function get_count_document_check()
+    {
+        date_default_timezone_set('Asia/Jakarta');
+        $start_date = date('Y-m-d', strtotime('-15 days'));
+        $end_date = date('Y-m-d', strtotime('+2 day'));
+        $result = DB::connection('sqlsrv4')->table('ShipHead')->where('ReadyToInvoice', 0)
+            ->whereBetween('ShipDate', [$start_date, $end_date])
+            ->where(function ($query) {
+                $query->where('ReadyToPrint_c', '=', 0);
+            })
+            ->count();
+        return $result;
+    }
+
+    public static function get_count_document_approve()
+    {
+        date_default_timezone_set('Asia/Jakarta');
+        $start_date = date('Y-m-d', strtotime('-15 days'));
+        $end_date = date('Y-m-d', strtotime('+2 day'));
+        $result = DB::connection('sqlsrv4')->table('ShipHead')->where('ReadyToInvoice', 0)
+            ->whereBetween('ShipDate', [$start_date, $end_date])
+            ->where(function ($query) {
+                $query->where('ReadyToPrint_c', '=', 1);
+            })
+            ->count();
+        return $result;
+    }
+
+    public static function get_count_document()
+    {
+        date_default_timezone_set('Asia/Jakarta');
+        $start_date = date('Y-m-d', strtotime('-15 days'));
+        $end_date = date('Y-m-d', strtotime('+2 day'));
+        $result = DB::connection('sqlsrv4')->table('ShipHead')->where('ReadyToInvoice', 0)
+            ->whereBetween('ShipDate', [$start_date, $end_date])
+            ->count();
+        return $result;
+    }
+
+    public static function sum_detail_doc($po_num)
+    {
+        $t = DB::connection('sqlsrv4')
+            ->table('Erp.PODetail AS a')
+            ->where('a.PONum', '=', $po_num)
+            ->select(DB::raw("SUM(a.DocExtCost + a.DocTotalTax) as result_sum"))
+            ->get();
+        if ($t->count() > 0) {
+            foreach ($t as $h) {
+                $result = $h->result_sum;
+            }
+        } else {
+            $result = 0;
+        }
+        return $result;
+    }
+
+    public static function sum_detail_doc_qty($po_num)
+    {
+        $t = DB::connection('sqlsrv4')
+            ->table('Erp.PODetail AS a')
+            ->where('a.PONum', '=', $po_num)
+            ->select(DB::raw("SUM(a.XOrderQty) as result_sum"))
+            ->get();
+        if ($t->count() > 0) {
+            foreach ($t as $h) {
+                $result = $h->result_sum;
+            }
+        } else {
+            $result = 0;
+        }
+        return $result;
+    }
+
+    public static function find_trc_name($trc_type_id, $flow_id)
+    {
+        $db = DB::table('t100_transaction_type')
+            ->where('trc_type_id', '=', $trc_type_id)
+            ->where('flow_id', '=', $flow_id)
+            ->select('trc_code')
+            ->get();
+        $r = $db->count();
+        if ($r > 0) {
+            foreach ($db as $h) {
+                $result = $h->trc_code;
+            }
+        } else {
+            $result = '';
+        }
+        return $result;
+    }
+
+    public static function get_section_list()
+    {
+        $result = DB::connection('sqlsrv4')->table('Ice.UD01')
+            ->select('Key1 as id', 'Character02 as desc')
+            ->where('Key5', 'Section')
+            ->where('CheckBox01', 1)
+            ->get();
+        return $result;
+    }
+
+
+    public static function data_detail($PackNum)
+    {
+        $result = DB::connection('sqlsrv4')->table('ShipHead AS a')
+            ->where('a.PackNum', $PackNum)->get();
+        return $result;
+    }
+
+
+    public static function detail_list_data($po_num)
+    {
+        $t = DB::connection('sqlsrv4')->table('Erp.PODetail AS a')
+            ->where('a.PONum', '=', $po_num)
+            ->select('a.*', DB::raw("NULL as PostCategoryID"),  DB::raw("NULL  AS Convertion"), DB::raw("NULL AS MLedgerID"))
+            ->orderBy('a.POLine', 'ASC')
+            ->get();
+        return $t;
+    }
+
+    public static function load_data_print_page($po_num, $Status, $print_option, $offset, $limit)
+    {
+        $query = DB::connection('sqlsrv4')->table('Erp.PODetail AS a')
+            ->join('Erp.PORel AS b', function ($join) {
+                $join->on('a.PONum', '=', 'b.PONum');
+                $join->on('a.POLine', '=', 'b.POLine');
+            })
+            ->leftJoin('Erp.ReqHead AS d', 'b.ReqNum', '=', 'd.ReqNum')
+            ->leftJoin('Erp.ReqHead_UD AS e', 'd.SysRowID', '=', 'e.ForeignSysRowID')
+            ->where('a.PONum', '=', $po_num)
+            ->select(
+                'a.POLine',
+                'b.PORelNum',
+                'a.PartNum',
+                'a.LineDesc',
+                'a.DueDate',
+                'a.OrderQty',
+                'a.XOrderQty',
+                'a.UnitCost',
+                'a.DocExtCost',
+                'a.PUM',
+                'a.IUM',
+                'e.ReqCategory_c',
+                'b.ReqNum',
+                'b.BaseQty',
+                'b.RelQty'
+            )
+            ->groupBy(
+                'a.POLine',
+                'b.PORelNum',
+                'a.PartNum',
+                'a.LineDesc',
+                'a.DueDate',
+                'a.OrderQty',
+                'a.XOrderQty',
+                'a.UnitCost',
+                'a.DocExtCost',
+                'a.PUM',
+                'a.IUM',
+                'e.ReqCategory_c',
+                'b.ReqNum',
+                'b.BaseQty',
+                'b.RelQty'
+            )
+            ->offset($offset)
+            ->limit($limit)
+            ->orderBy('a.POLine', 'ASC')
+            ->get();
+
+        $data = array();
+        $no = $offset + 1;
+
+        foreach ($query as $l) {
+            $dtDelivery = AppModel::local_date_formate_name(substr($l->DueDate, 0, 10));
+            $ItemName = $l->LineDesc;
+            $ItemNum_Req = $l->PartNum;
+            if ($Status == 1) {
+                $StatusX = '- Draft';
+            } else {
+                $StatusX = '';
+            }
+            if ($print_option != 0) {
+                $Product = $ItemNum_Req . ' - ' . $ItemName;
+            } else {
+                $Product = $ItemName;
+            }
+
+
+            $line_x = $no . '^' . $ItemNum_Req . '^' . $dtDelivery . '^' . number_format(round($l->BaseQty)) . '^' . $l->PUM . '^' .
+                number_format(round($l->UnitCost, 2), 2) . '^' . number_format(round($l->UnitCost * $l->RelQty, 2), 2) . '^' .
+                number_format(round($l->UnitCost * $l->RelQty, 2), 2) . '^' . number_format(round($l->RelQty)) . '^' . $l->IUM . '^0^' . $ItemName
+                . '^' . $l->ReqCategory_c . '^' . $l->ReqNum;
+
+            $no++;
+            $data[] = explode('^', chop($line_x));
+        }
+        return $data;
+    }
+}

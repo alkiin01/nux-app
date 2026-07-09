@@ -1,0 +1,1 @@
+<object data="<?php echo route('di_print_preview', ['trc_unix_id'=> $trc_unix_id]) ; ?>" type="application/pdf" style="width:100%;height:1100px;" internalinstanceid="8"></object>

@@ -1,0 +1,2 @@
+<iframe src="<?php echo env('APP_URL') ?>/production_schedule_tag_label_preview?layout=<?php echo $layout; ?>&ref_doc=<?php echo $ref_doc; ?>" 
+style="width:100%; height:700px;" frameborder="0"></iframe>

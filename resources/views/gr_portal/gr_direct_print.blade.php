@@ -1,0 +1,1 @@
+<object data="<?php echo route('gr_file_print', ['trc_unix_id'=>$trc_unix_id, 'ref_form'=>$ref_form]) ; ?>" type="application/pdf" style="width:100%;height:700px;" internalinstanceid="8"></object>
