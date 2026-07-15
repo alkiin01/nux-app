@@ -23,20 +23,24 @@ class MasterPackShipment extends Model
             $result = $result->where(function ($query) use ($search) {
                 $query->where('m.PackingListNum', 'LIKE', "%$search%")
                       ->orWhere('m.CustomerName',  'LIKE', "%$search%")
-                      ->orWhere('m.CustID',        'LIKE', "%$search%")
+                      ->orWhere('m.CustID',        'LIKE', "%$search%") 
                       ->orWhere('m.ShipViaCode',   'LIKE', "%$search%")
                       ->orWhere('t.Nopol',         'LIKE', "%$search%")
                       ->orWhere('t.Driver',        'LIKE', "%$search%");
             });
         }
-
+        if($status_id == 0) {
+            $result = $result->whereNull('m.PackingListNum')->whereNull('m.ShippedAt');
+        }
         if ($status_id == 1) {
             $result = $result->whereNull('m.PackingListNum');
         } elseif ($status_id == 2) {
-            $result = $result->whereNotNull('m.PackingListNum');
+            $result = $result->whereNotNull('m.PackingListNum')->whereNull('m.ShippedAt');
+        } elseif ($status_id == 3) {
+            $result = $result->whereNotNull('m.ShippedAt');
         }
 
-        return $result->select('m.id', 'm.PackingListNum', 'm.CustID', 'm.CustomerName', 'm.ShipViaCode', 'm.ManualNopol', 'm.ManualDriver', 'm.CreatedAt', 'm.CreatedBy', 't.Nopol', 't.Driver');
+        return $result->select('m.id', 'm.PackingListNum', 'm.CustID', 'm.CustomerName', 'm.ShipViaCode', 'm.ManualNopol', 'm.ManualDriver', 'm.CreatedAt', 'm.CreatedBy', 'm.ShippedAt', 'm.ShippedBy', 't.Nopol', 't.Driver');
     }
 
     // ── Header CRUD ──────────────────────────────────────────────────────────
@@ -169,6 +173,15 @@ class MasterPackShipment extends Model
         return DB::table('MasterPackShipments')
             ->whereNull('DeletedAt')
             ->whereNotNull('PackingListNum')
+            ->whereNull('ShippedAt')
+            ->count();
+    }
+
+    public static function count_shipped()
+    {
+        return DB::table('MasterPackShipments')
+            ->whereNull('DeletedAt')
+            ->whereNotNull('ShippedAt')
             ->count();
     }
 }

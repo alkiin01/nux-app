@@ -272,7 +272,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('receipt_entry.insert_gr', [ReceiptEntryController::class, 'insert_gr'])->name('receipt_entry.insert_gr');
     Route::post('receipt_entry.new_insert_gr', [ReceiptEntryController::class, 'new_insert_gr'])->name('receipt_entry.new_insert_gr');
     Route::post('receipt_entry.delete_gr', [App\Http\Controllers\ReceiptEntryController::class, 'delete_gr'])->name('receipt_entry.delete_gr');
-    #region GenbaManagement
+ #region GenbaManagement
     Route::get('/team', [App\Http\Controllers\GenbaManagementController::class, 'index'])->name('/team');
     Route::post('team.add_document', [App\Http\Controllers\GenbaManagementController::class, 'add_team'])->name('team.add_document');
     Route::post('team.get_team_data', [App\Http\Controllers\GenbaManagementController::class, 'get_team_data'])->name('team.get_team_data');
@@ -349,7 +349,7 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('memo_misc_issue.delete_memo', [App\Http\Controllers\GeneralMemoController::class, 'delete_memo'])->name('memo_misc_issue.delete_memo');
     Route::post('memo_misc_issue.front_table', [App\Http\Controllers\GeneralMemoController::class, 'front_table'])->name('memo_misc_issue.front_table');
 
-    #endregion
+ #endregion
 
     Route::get('/pr_approval/export-excel', [App\Http\Controllers\PRApprovalController::class, 'exportExcel'])
         ->name('pr_approval.export_excel')
@@ -358,14 +358,14 @@ Route::group(['middleware' => ['auth']], function () {
     Route::get('/po_approval/export-excel', [App\Http\Controllers\POApprovalController::class, 'exportExcel'])
         ->name('po_approval.export_excel')
         ->middleware(['auth']);
-    #region AP Invoice
+ #region AP Invoice
     Route::prefix('ap_invoice')->group(function () {
         Route::get('', [ApInvoiceController::class, 'index']);
         Route::post('table_primary', [ApInvoiceController::class, 'tablePrimary']);
         Route::post('header', [ApInvoiceController::class, 'header']);
         Route::post('preview_doc', [ApInvoiceController::class, 'preview_doc']);
         Route::get('preview_doc', function () {
-            return redirect('ap_invoice');
+  return redirect('ap_invoice');
         });
         Route::post('preview_doc/detail', [ApInvoiceController::class, 'previewDetail']);
         Route::post('approved', [ApInvoiceController::class, 'approved']);
@@ -376,9 +376,9 @@ Route::group(['middleware' => ['auth']], function () {
         Route::post('detail_packslip', [ApInvoiceController::class, 'detailPackSlip']);
         Route::post('change_terms', [ApInvoiceController::class, 'change_terms']);
     });
-    #endregion
+ #endregion
 
-    #region Issue Miscellaneos
+ #region Issue Miscellaneos
     Route::get('/issue_miscellaneous', [App\Http\Controllers\IssueMiscellaneousController::class, 'index'])->name('issue_miscellaneous.index');
     Route::post('issue_miscellaneous/front_table', [App\Http\Controllers\IssueMiscellaneousController::class, 'front_table'])->name('issue_miscellaneous.front_table');
     Route::post('issue_miscellaneous/add_document', [App\Http\Controllers\IssueMiscellaneousController::class, 'add_document'])->name('issue_miscellaneous.add_document');
@@ -402,9 +402,9 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('issue_miscellaneous.approve_document', [App\Http\Controllers\IssueMiscellaneousController::class, 'approve_document'])->name('issue_miscellaneous.approve_document');
     Route::post('issue_miscellaneous.reject_document', [App\Http\Controllers\IssueMiscellaneousController::class, 'reject_document'])->name('issue_miscellaneous.reject_document');
     Route::post('issue_miscellaneous/get_approval_status_counts', [App\Http\Controllers\IssueMiscellaneousController::class, 'get_approval_status_counts'])->name('issue_miscellaneous.get_approval_status_counts');
-    #endregion
+ #endregion
 
-    #region Issue Material
+ #region Issue Material
     Route::get('/inventory_rm_out', [App\Http\Controllers\IssueMaterialController::class, 'index'])->name('inventory_rm_out.index');
     Route::post('inventory_rm_out/load_form', [App\Http\Controllers\IssueMaterialController::class, 'form_load'])->name('inventory_rm_out.load_form');
     Route::post('inventory_rm_out/front_table', [App\Http\Controllers\IssueMaterialController::class, 'front_table'])->name('inventory_rm_out.front_table');
@@ -416,22 +416,24 @@ Route::group(['middleware' => ['auth']], function () {
     Route::post('inventory_rm_out/sync_internal_api', [App\Http\Controllers\IssueMaterialController::class, 'sync_internal_api'])->name('inventory_rm_out.sync_internal_api');
     #endregion
 
-    #region Master Pack Shipment
+ #region Master Pack Shipment
     Route::get('/master_pack_shipment', [App\Http\Controllers\MasterPackShipmentController::class, 'index']);
     Route::post('mps.count_document',   [App\Http\Controllers\MasterPackShipmentController::class, 'get_count_document'])->name('mps.count_document');
     Route::post('mps.front_table',      [App\Http\Controllers\MasterPackShipmentController::class, 'front_table'])->name('mps.front_table');
     Route::post('mps.get_document_data', [App\Http\Controllers\MasterPackShipmentController::class, 'get_document_data'])->name('mps.get_document_data');
-    Route::post('mps.store_head',       [App\Http\Controllers\MasterPackShipmentController::class, 'store_head'])->name('mps.store_head');
-    Route::post('mps.submit',           [App\Http\Controllers\MasterPackShipmentController::class, 'submit_document'])->name('mps.submit');
-    Route::post('mps.unsubmit',         [App\Http\Controllers\MasterPackShipmentController::class, 'unsubmit_document'])->name('mps.unsubmit');
+    Route::post('mps.store_head', [App\Http\Controllers\MasterPackShipmentController::class, 'store_head'])->name('mps.store_head');
+    Route::post('mps.submit', [App\Http\Controllers\MasterPackShipmentController::class, 'submit_document'])->name('mps.submit');
+    Route::post('mps.unsubmit', [App\Http\Controllers\MasterPackShipmentController::class, 'unsubmit_document'])->name('mps.unsubmit');
     Route::post('mps.detail_table',     [App\Http\Controllers\MasterPackShipmentController::class, 'detail_table'])->name('mps.detail_table');
-    Route::post('mps.scan_qr',          [App\Http\Controllers\MasterPackShipmentController::class, 'scan_qr'])->name('mps.scan_qr');
+    Route::post('mps.scan_qr',  [App\Http\Controllers\MasterPackShipmentController::class, 'scan_qr'])->name('mps.scan_qr');
+    Route::post('mps.scan_packing_list_shipment', [App\Http\Controllers\MasterPackShipmentController::class, 'scan_packing_list_shipment'])->name('mps.scan_packing_list_shipment');
+    Route::post('mps.cancel_packing_list_shipment', [App\Http\Controllers\MasterPackShipmentController::class, 'cancel_packing_list_shipment'])->name('mps.cancel_packing_list_shipment');
     Route::post('mps.delete_detail',    [App\Http\Controllers\MasterPackShipmentController::class, 'delete_detail'])->name('mps.delete_detail');
     Route::post('mps.delete_document',  [App\Http\Controllers\MasterPackShipmentController::class, 'delete_document'])->name('mps.delete_document');
     Route::post('mps.ship_via_list',    [App\Http\Controllers\MasterPackShipmentController::class, 'get_ship_via_list'])->name('mps.ship_via_list');
     Route::post('mps.trucking_list',    [App\Http\Controllers\MasterPackShipmentController::class, 'get_trucking_list'])->name('mps.trucking_list');
     Route::get('master_pack_shipment/print_pdf', [App\Http\Controllers\MasterPackShipmentController::class, 'print_pdf'])->name('mps.print_pdf');
-    #endregion
+ #endregion
 
     Route::prefix('data_users')->group(function () {
         Route::get('/', [UsersController::class, 'index'])->name('data_users.index');
@@ -447,8 +449,8 @@ Route::group(['middleware' => ['auth']], function () {
         Route::post('delete_menu', [UsersController::class, 'delete_menu'])->name('data_users.delete_menu');
         Route::post('delete_user', [UsersController::class, 'delete_user'])->name('data_users.delete_user');
     });
-    #endregion
-    #region data menu
+ #endregion
+ #region data menu
     Route::prefix('data_menu')->group(function () {
         Route::get('/', [MenuController::class, 'index'])->name('data_menu.index');
         Route::post('front_table', [MenuController::class, 'front_table'])->name('data_menu.front_table');
@@ -464,8 +466,8 @@ Route::group(['middleware' => ['auth']], function () {
         Route::post('save_menu_edit', [MenuController::class, 'save_menu_edit'])->name('data_menu.save_menu_edit');
         Route::post('delete_data_menu', [MenuController::class, 'delete_data_menu']);
     });
-    #endregion
-    #region Surat Jalan General
+ #endregion
+ #region Surat Jalan General
     Route::get('/sj_general', [App\Http\Controllers\SjGeneralController::class, 'index'])->name('sj_general.index');
     Route::get('/sj_general/create', [App\Http\Controllers\SjGeneralController::class, 'create'])->name('sj_general.create');
     Route::get('/sj_general/edit', [App\Http\Controllers\SjGeneralController::class, 'edit'])->name('sj_general.edit');

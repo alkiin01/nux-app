@@ -51,7 +51,7 @@
 
                 {{-- Summary Cards --}}
                 <div class="row g-2 g-xl-8 mb-5">
-                    <div class="col-xl-4 col-lg-4 col-sm-4">
+                    <div class="col-xl-3 col-lg-3 col-sm-6">
                         <a href="#" onclick="filterByStatus(0, this);"
                             class="card bgi-no-repeat card-xl-stretch card-front"
                             style="background-position:right top;background-size:30% auto;
@@ -62,7 +62,7 @@
                             </div>
                         </a>
                     </div>
-                    <div class="col-xl-4 col-lg-4 col-sm-4">
+                    <div class="col-xl-3 col-lg-3 col-sm-6">
                         <a href="#" onclick="filterByStatus(1, this);"
                             class="card bgi-no-repeat card-xl-stretch card-front"
                             style="background-position:right top;background-size:30% auto;
@@ -73,14 +73,25 @@
                             </div>
                         </a>
                     </div>
-                    <div class="col-xl-4 col-lg-4 col-sm-4">
+                    <div class="col-xl-3 col-lg-3 col-sm-6">
                         <a href="#" onclick="filterByStatus(2, this);"
                             class="card bgi-no-repeat card-xl-stretch card-front"
                             style="background-position:right top;background-size:30% auto;
                                    background-image:url(<?= env('APP_ASSETS') ?>assets/media/svg/shapes/abstract-1.svg)">
                             <div class="card-body">
                                 <div class="text-gray-900 fw-bolder fs-4 mb-2 mt-2" id="card_submitted">-</div>
-                                <div class="fw-bold text-gray-900">Submitted</div>
+                                <div class="fw-bold text-gray-900">Submit</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-xl-3 col-lg-3 col-sm-6">
+                        <a href="#" onclick="filterByStatus(3, this);"
+                            class="card bgi-no-repeat card-xl-stretch card-front"
+                            style="background-position:right top;background-size:30% auto;
+                                   background-image:url(<?= env('APP_ASSETS') ?>assets/media/svg/shapes/abstract-3.svg)">
+                            <div class="card-body">
+                                <div class="text-gray-900 fw-bolder fs-4 mb-2 mt-2" id="card_shipped">-</div>
+                                <div class="fw-bold text-gray-900">Shipped</div>
                             </div>
                         </a>
                     </div>
@@ -123,7 +134,8 @@
                                     <select class="form-select form-select-solid form-select-sm" id="status_filter">
                                         <option value="0">All</option>
                                         <option value="1">Draft</option>
-                                        <option value="2">Submitted</option>
+                                        <option value="2">Submit</option>
+                                        <option value="3">Shipped</option>
                                     </select>
                                     <div class="d-flex justify-content-end mt-4">
                                         <button type="button" class="btn btn-primary btn-sm"
@@ -136,6 +148,21 @@
                             </div>
 
                             {{-- Create button --}}
+                            <button type="button" class="btn btn-light-warning btn-sm me-2" onclick="openPackingListScanModal()">
+                                <span class="svg-icon svg-icon-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path opacity="0.3" d="M5 4C3.89543 4 3 4.89543 3 6V8H5V6H7V4H5Z" fill="black"/>
+                                        <path opacity="0.3" d="M19 4H17V6H19V8H21V6C21 4.89543 20.1046 4 19 4Z" fill="black"/>
+                                        <path opacity="0.3" d="M5 20H7V18H5V16H3V18C3 19.1046 3.89543 20 5 20Z" fill="black"/>
+                                        <path opacity="0.3" d="M19 20C20.1046 20 21 19.1046 21 18V16H19V18H17V20H19Z" fill="black"/>
+                                        <rect x="7" y="10" width="2" height="4" rx="1" fill="black"/>
+                                        <rect x="11" y="9" width="2" height="6" rx="1" fill="black"/>
+                                        <rect x="15" y="10" width="2" height="4" rx="1" fill="black"/>
+                                    </svg>
+                                </span>
+                                Scan PackingList
+                            </button>
+
                             <button type="button" class="btn btn-light-primary btn-sm" onclick="createDocument()">
                                 <span class="svg-icon svg-icon-2">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -278,6 +305,10 @@
                                         Unsubmit
                                     </button>
                                     <button type="button" class="btn btn-light-danger btn-sm"
+                                        id="btn_cancel_shipment" onclick="cancelCurrentShipment()" style="display:none">
+                                        Cancel Shipment
+                                    </button>
+                                    <button type="button" class="btn btn-light-danger btn-sm"
                                         id="btn_delete_document" onclick="deleteDocument()" style="display:none">
                                         Hapus
                                     </button>
@@ -363,6 +394,33 @@
 </div>
 </div>
 
+{{-- Modal Scan PackingList untuk Shipment/Shipped massal --}}
+<div class="modal fade" id="modal_scan_packinglist" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scan PackingList</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label fw-bold fs-7">Packing List No.</label>
+                <input type="text" id="packing_list_scan_input"
+                    class="form-control form-control-sm form-control-solid"
+                    placeholder="Contoh: SAI-PCH-26070001" autocomplete="off" />
+                <div class="form-text">Scan barcode packing list untuk trigger Shipment/Shipped massal.</div>
+                <div id="packing_list_scan_feedback" class="mt-3" style="display:none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light btn-sm" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-warning btn-sm" id="btn_scan_packing_list_submit" onclick="submitPackingListShipmentScan()">
+                    <span id="spinner_scan_packing_list" class="spinner-border spinner-border-sm me-2" style="display:none"></span>
+                    Proses Shipment/Shipped
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
 {{-- SCRIPTS                                                             --}}
 {{-- ═══════════════════════════════════════════════════════════════════ --}}
@@ -373,6 +431,9 @@ var currentDocId    = 0;
 var currentDocIsSubmitted = 0;
 var frontTable      = null;
 var detailTable     = null;
+var packingListScanModal = null;
+var isPackingListScanProcessing = false;
+var isRowShipmentProcessing = false;
 
 // ── Init ──────────────────────────────────────────────────────────────────
 $(document).ready(function () {
@@ -405,7 +466,86 @@ $(document).ready(function () {
             processScan();
         }
     });
+
+    $('#packing_list_scan_input').on('keypress', function (e) {
+        if (e.which === 13) {
+            e.preventDefault();
+            submitPackingListShipmentScan();
+        }
+    });
 });
+
+function openPackingListScanModal() {
+    if (!packingListScanModal) {
+        packingListScanModal = new bootstrap.Modal(document.getElementById('modal_scan_packinglist'));
+    }
+
+    $('#packing_list_scan_input').val('');
+    $('#packing_list_scan_feedback').hide().removeClass('alert-success alert-warning alert-danger').html('');
+    packingListScanModal.show();
+
+    setTimeout(function () {
+        $('#packing_list_scan_input').focus();
+    }, 250);
+}
+
+function submitPackingListShipmentScan() {
+    if (isPackingListScanProcessing) return;
+
+    var packingListNum = $('#packing_list_scan_input').val().trim();
+
+    if (!packingListNum) {
+        $('#packing_list_scan_feedback')
+            .removeClass('alert-success alert-warning alert-danger')
+            .addClass('alert alert-warning')
+            .html('Packing List No. wajib diisi.')
+            .show();
+        return;
+    }
+
+    isPackingListScanProcessing = true;
+    $('#spinner_scan_packing_list').show();
+    $('#btn_scan_packing_list_submit').prop('disabled', true).text('Memproses...');
+    $('#packing_list_scan_input').prop('disabled', true);
+
+    $.post('{{ route("mps.scan_packing_list_shipment") }}', {
+        _token: '{{ csrf_token() }}',
+        packing_list_num: packingListNum
+    }, function (res) {
+        isPackingListScanProcessing = false;
+        $('#spinner_scan_packing_list').hide();
+        $('#btn_scan_packing_list_submit').prop('disabled', false).text('Proses Shipment/Shipped');
+        $('#packing_list_scan_input').prop('disabled', false);
+
+        var alertClass = 'alert-danger';
+        if (res.status == 1) {
+            alertClass = 'alert-success';
+        } else if (res.status == 2) {
+            alertClass = 'alert-warning';
+        }
+
+        $('#packing_list_scan_feedback')
+            .removeClass('alert-success alert-warning alert-danger')
+            .addClass('alert ' + alertClass)
+            .html(res.message || 'Terjadi kesalahan')
+            .show();
+
+        if (res.status == 1 || res.status == 2) {
+            frontTable.ajax.reload(null, false);
+            loadCountDocument();
+        }
+    }, 'json').fail(function () {
+        isPackingListScanProcessing = false;
+        $('#spinner_scan_packing_list').hide();
+        $('#btn_scan_packing_list_submit').prop('disabled', false).text('Proses Shipment/Shipped');
+        $('#packing_list_scan_input').prop('disabled', false);
+        $('#packing_list_scan_feedback')
+            .removeClass('alert-success alert-warning alert-danger')
+            .addClass('alert alert-danger')
+            .html('Terjadi kesalahan server')
+            .show();
+    });
+}
 
 // ── Load summary cards ────────────────────────────────────────────────────
 function loadCountDocument() {
@@ -415,6 +555,7 @@ function loadCountDocument() {
         $('#card_total').text(res.total);
         $('#card_draft').text(res.draft);
         $('#card_submitted').text(res.submitted);
+        $('#card_shipped').text(res.shipped);
     }, 'json');
 }
 
@@ -597,7 +738,7 @@ function createDocument() {
     currentDocIsSubmitted = 0;
 
     resetHeaderForm();
-    $('#badge_status_form').text('New').removeClass('badge-light-success badge-light-warning').addClass('badge-light-info');
+    $('#badge_status_form').text('New').removeClass('badge-light-success badge-light-warning badge-light-primary').addClass('badge-light-info');
     $('#btn_delete_document').hide();
     $('#card_scan_section').hide();
     $('#card_print').hide();
@@ -661,24 +802,37 @@ function openDocument(trc_unix_id) {
             $('#form_created_info').show();
         }
 
-        if (res.is_submitted) {
+        if (res.is_shipped) {
+            $('#badge_status_form').text('Shipped')
+                .removeClass('badge-light-warning badge-light-info badge-light-success')
+                .addClass('badge-light-primary');
+            setFormEditable(false);
+            $('#btn_delete_document').hide();
+            $('#btn_submit_document').hide();
+            $('#btn_unsubmit_document').hide();
+            $('#btn_cancel_shipment').show();
+            $('#card_scan_section').hide();
+            $('#card_print').show();
+        } else if (res.is_submitted) {
             $('#badge_status_form').text('Submitted')
-                .removeClass('badge-light-warning badge-light-info')
+                .removeClass('badge-light-warning badge-light-info badge-light-primary')
                 .addClass('badge-light-success');
             setFormEditable(false);
             $('#btn_delete_document').hide();
             $('#btn_submit_document').hide();
             $('#btn_unsubmit_document').show();
+            $('#btn_cancel_shipment').hide();
             $('#card_scan_section').hide();
             $('#card_print').show();
         } else {
             $('#badge_status_form').text('Draft')
-                .removeClass('badge-light-success badge-light-info')
+                .removeClass('badge-light-success badge-light-info badge-light-primary')
                 .addClass('badge-light-warning');
             setFormEditable(true);
             $('#btn_delete_document').show();
             $('#btn_submit_document').show();
             $('#btn_unsubmit_document').hide();
+            $('#btn_cancel_shipment').hide();
             $('#card_scan_section').show();
             $('#card_print').hide();
         }
@@ -693,6 +847,113 @@ function openDocument(trc_unix_id) {
     }, 'json').fail(function () {
         Swal.fire('Error', 'Terjadi kesalahan server saat membuka dokumen', 'error');
     });
+}
+
+function triggerShipmentByPackingList(packingListNum) {
+    if (!packingListNum) return;
+    if (isRowShipmentProcessing) return;
+
+    Swal.fire({
+        title: 'Trigger Shipment/Shipped?',
+        text: 'Packing List: ' + packingListNum,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Proses',
+        cancelButtonText: 'Batal'
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+
+        isRowShipmentProcessing = true;
+        Swal.fire({
+            title: 'Memproses Shipment/Shipped',
+            text: 'Packing List: ' + packingListNum,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: function () {
+                Swal.showLoading();
+            }
+        });
+
+        $.post('{{ route("mps.scan_packing_list_shipment") }}', {
+            _token: '{{ csrf_token() }}',
+            packing_list_num: packingListNum
+        }, function (res) {
+            isRowShipmentProcessing = false;
+            if (res.status == 1) {
+                Swal.fire({ icon: 'success', title: 'Berhasil', text: res.message, timer: 2200, showConfirmButton: false });
+            } else if (res.status == 2) {
+                Swal.fire('Parsial', res.message, 'warning');
+            } else {
+                Swal.fire('Gagal', res.message, 'error');
+            }
+            loadCountDocument();
+            frontTable.ajax.reload(null, false);
+        }, 'json').fail(function () {
+            isRowShipmentProcessing = false;
+            Swal.fire('Error', 'Terjadi kesalahan server', 'error');
+        });
+    });
+}
+
+function cancelShipmentByPackingList(packingListNum) {
+    if (!packingListNum) return;
+    if (isRowShipmentProcessing) return;
+
+    Swal.fire({
+        title: 'Cancel Shipment?',
+        text: 'Packing List: ' + packingListNum,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Ya, Cancel',
+        cancelButtonText: 'Batal',
+        confirmButtonColor: '#d33'
+    }).then(function (result) {
+        if (!result.isConfirmed) return;
+
+        isRowShipmentProcessing = true;
+        Swal.fire({
+            title: 'Memproses Cancel Shipment',
+            text: 'Packing List: ' + packingListNum,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: function () {
+                Swal.showLoading();
+            }
+        });
+
+        $.post('{{ route("mps.cancel_packing_list_shipment") }}', {
+            _token: '{{ csrf_token() }}',
+            packing_list_num: packingListNum
+        }, function (res) {
+            isRowShipmentProcessing = false;
+
+            if (res.status == 1) {
+                Swal.fire({ icon: 'success', title: 'Berhasil', text: res.message, timer: 2200, showConfirmButton: false });
+            } else if (res.status == 2) {
+                Swal.fire('Parsial', res.message, 'warning');
+            } else {
+                Swal.fire('Gagal', res.message, 'error');
+            }
+
+            loadCountDocument();
+            frontTable.ajax.reload(null, false);
+        }, 'json').fail(function () {
+            isRowShipmentProcessing = false;
+            Swal.fire('Error', 'Terjadi kesalahan server', 'error');
+        });
+    });
+}
+
+function cancelCurrentShipment() {
+    var packingListNum = $('#form_packing_list_num').val().trim();
+    if (!packingListNum) {
+        Swal.fire('Gagal', 'Packing List No. tidak ditemukan', 'error');
+        return;
+    }
+
+    cancelShipmentByPackingList(packingListNum);
 }
 
 // ── Save header ───────────────────────────────────────────────────────────
@@ -822,7 +1083,7 @@ function submitDocument() {
                 $('#form_packing_list_num').val(res.PackingListNum);
                 $('#div_packing_list_num').show();
                 $('#badge_status_form').text('Submitted')
-                    .removeClass('badge-light-warning badge-light-info')
+                    .removeClass('badge-light-warning badge-light-info badge-light-primary')
                     .addClass('badge-light-success');
                 setFormEditable(false);
                 $('#btn_delete_document').hide();
@@ -864,12 +1125,13 @@ function unsubmitDocument() {
                 $('#form_packing_list_num').val('');
                 $('#div_packing_list_num').hide();
                 $('#badge_status_form').text('Draft')
-                    .removeClass('badge-light-success badge-light-info')
+                    .removeClass('badge-light-success badge-light-info badge-light-primary')
                     .addClass('badge-light-warning');
                 setFormEditable(true);
                 $('#btn_unsubmit_document').hide();
                 $('#btn_submit_document').show();
                 $('#btn_delete_document').show();
+                $('#btn_cancel_shipment').hide();
                 $('#card_scan_section').show();
                 $('#card_print').hide();
                 currentDocIsSubmitted = 0;
@@ -969,6 +1231,7 @@ function resetHeaderForm() {
     $('#scan_feedback').hide();
     $('#btn_submit_document').hide();
     $('#btn_unsubmit_document').hide();
+    $('#btn_cancel_shipment').hide();
 }
 
 function setFormEditable(editable) {

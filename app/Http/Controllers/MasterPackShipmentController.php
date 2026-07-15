@@ -15,6 +15,52 @@ use PDF;
 
 class MasterPackShipmentController extends Controller
 {
+    private function call_shipment_shipped($pack_num, $ready_to_invoice)
+    {
+        $client   = new Client();
+        $password = Crypt::decryptString(Auth::user()->epicor_password);
+
+        try {
+            $api_resp = $client->request('POST', self::get_host_api() . 'Shipment/Shipped', [
+                'json' => [
+                    'packNum'        => (int) $pack_num,
+                    'readyToInvoice' => (bool) $ready_to_invoice,
+                    'nik'            => Auth::user()->username,
+                    'password'       => $password,
+                ],
+                'headers' => ['Content-Type' => 'application/json'],
+                'verify'  => false,
+                'timeout' => 30,
+            ]);
+
+            $api_body = json_decode((string) $api_resp->getBody(), true);
+            if (empty($api_body) || ($api_body['code'] ?? 0) != 200) {
+                return [
+                    'ok'    => false,
+                    'error' => $api_body['desc'] ?? 'Gagal memproses Shipment/Shipped di Epicor',
+                ];
+            }
+
+            return ['ok' => true, 'body' => $api_body];
+        } catch (\GuzzleHttp\Exception\RequestException $e) {
+            $err_desc = null;
+            if ($e->hasResponse()) {
+                $err_json = json_decode((string) $e->getResponse()->getBody(), true);
+                $err_desc = $err_json['desc'] ?? null;
+            }
+
+            return [
+                'ok'    => false,
+                'error' => $err_desc ?? $e->getMessage(),
+            ];
+        } catch (\Exception $e) {
+            return [
+                'ok'    => false,
+                'error' => $e->getMessage(),
+            ];
+        }
+    }
+
     // ─── Main page ───────────────────────────────────────────────────────────
 
     public function index()
@@ -39,6 +85,7 @@ class MasterPackShipmentController extends Controller
         $data['total']     = MasterPackShipment::count_total();
         $data['draft']     = MasterPackShipment::count_draft();
         $data['submitted'] = MasterPackShipment::count_submitted();
+        $data['shipped']   = MasterPackShipment::count_shipped();
         echo json_encode($data);
     }
 
@@ -76,12 +123,16 @@ class MasterPackShipmentController extends Controller
         foreach ($posts as $post) {
             $sys_id = Crypt::encryptString((string) $post->id);
 
-            $status_badge = $post->PackingListNum
-                ? '<span class="badge badge-light-success">Submitted</span>'
-                : '<span class="badge badge-light-warning">Draft</span>';
+            if ($post->ShippedAt) {
+                $status_badge = '<span class="badge badge-light-info">Shipped</span>';
+            } elseif ($post->PackingListNum) {
+                $status_badge = '<span class="badge badge-light-success">Submitted</span>';
+            } else {
+                $status_badge = '<span class="badge badge-light-warning">Draft</span>';
+            }
 
             $action = '
-                <button type="button" class="btn btn-icon btn-light-primary btn-xs"
+                <button type="button" class="btn btn-icon btn-light-primary btn-xs me-1"
                     onclick="openDocument(\'' . $sys_id . '\')" title="Open">
                     <span class="svg-icon svg-icon-3">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -90,6 +141,38 @@ class MasterPackShipmentController extends Controller
                         </svg>
                     </span>
                 </button>';
+
+            if ($post->PackingListNum && !$post->ShippedAt) {
+                $action .= '
+                <button type="button" class="btn btn-icon btn-light-warning btn-xs"
+                    onclick="triggerShipmentByPackingList(\'' . e($post->PackingListNum) . '\')" title="Trigger Shipment/Shipped">
+                    <span class="svg-icon svg-icon-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path opacity="0.3" d="M5 4C3.89543 4 3 4.89543 3 6V8H5V6H7V4H5Z" fill="black"/>
+                            <path opacity="0.3" d="M19 4H17V6H19V8H21V6C21 4.89543 20.1046 4 19 4Z" fill="black"/>
+                            <path opacity="0.3" d="M5 20H7V18H5V16H3V18C3 19.1046 3.89543 20 5 20Z" fill="black"/>
+                            <path opacity="0.3" d="M19 20C20.1046 20 21 19.1046 21 18V16H19V18H17V20H19Z" fill="black"/>
+                            <rect x="7" y="10" width="2" height="4" rx="1" fill="black"/>
+                            <rect x="11" y="9" width="2" height="6" rx="1" fill="black"/>
+                            <rect x="15" y="10" width="2" height="4" rx="1" fill="black"/>
+                        </svg>
+                    </span>
+                </button>';
+            } elseif ($post->PackingListNum && $post->ShippedAt) {
+                $action .= '
+                <button type="button" class="btn btn-icon btn-light-danger btn-xs"
+                    onclick="cancelShipmentByPackingList(\'' . e($post->PackingListNum) . '\')" title="Cancel Shipment">
+                    <span class="svg-icon svg-icon-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path opacity="0.3" d="M5 4C3.89543 4 3 4.89543 3 6V8H5V6H7V4H5Z" fill="black"/>
+                            <path opacity="0.3" d="M19 4H17V6H19V8H21V6C21 4.89543 20.1046 4 19 4Z" fill="black"/>
+                            <path opacity="0.3" d="M5 20H7V18H5V16H3V18C3 19.1046 3.89543 20 5 20Z" fill="black"/>
+                            <path opacity="0.3" d="M19 20C20.1046 20 21 19.1046 21 18V16H19V18H17V20H19Z" fill="black"/>
+                            <path d="M9.17157 9.17157C9.5621 8.78105 10.1953 8.78105 10.5858 9.17157L12 10.5858L13.4142 9.17157C13.8047 8.78105 14.4379 8.78105 14.8284 9.17157C15.219 9.5621 15.219 10.1953 14.8284 10.5858L13.4142 12L14.8284 13.4142C15.219 13.8047 15.219 14.4379 14.8284 14.8284C14.4379 15.219 13.8047 15.219 13.4142 14.8284L12 13.4142L10.5858 14.8284C10.1953 15.219 9.5621 15.219 9.17157 14.8284C8.78105 14.4379 8.78105 13.8047 9.17157 13.4142L10.5858 12L9.17157 10.5858C8.78105 10.1953 8.78105 9.5621 9.17157 9.17157Z" fill="black"/>
+                        </svg>
+                    </span>
+                </button>';
+            }
 
             $nestedData['no']             = $no++;
             $nestedData['action']         = $action;
@@ -156,6 +239,11 @@ class MasterPackShipmentController extends Controller
                 ? AppModel::local_date_formate(substr($header->CreatedAt, 0, 10))
                 : '';
             $data['is_submitted']   = $header->PackingListNum ? 1 : 0;
+            $data['is_shipped']     = $header->ShippedAt ? 1 : 0;
+            $data['ShippedAt']      = $header->ShippedAt
+                ? AppModel::local_date_formate(substr($header->ShippedAt, 0, 10))
+                : '';
+            $data['ShippedBy']      = $header->ShippedBy ?? '';
             $data['trc_unix_id']    = $request->trc_unix_id;
         } else {
             $data['ref_tab'] = 0;
@@ -271,10 +359,16 @@ class MasterPackShipmentController extends Controller
             echo json_encode(['status' => 0, 'message' => 'Dokumen belum disubmit']);
             return;
         }
+        if ($header->ShippedAt) {
+            echo json_encode(['status' => 0, 'message' => 'Dokumen sudah berstatus Shipped, tidak bisa unsubmit']);
+            return;
+        }
 
         try {
             MasterPackShipment::update_header($doc_id, [
                 'PackingListNum' => null,
+                'ShippedAt'      => null,
+                'ShippedBy'      => null,
                 'UpdatedAt'      => now(),
                 'UpdatedBy'      => Auth::user()->username,
             ]);
@@ -376,8 +470,9 @@ class MasterPackShipmentController extends Controller
             echo json_encode(['status' => 0, 'message' => 'PackNum ' . $pack_num . ' tidak ditemukan di Epicor']);
             return;
         }
-        if (strtolower($ship_head->ShipStatus) !== 'open') {
-            echo json_encode(['status' => 0, 'message' => 'Surat jalan ' . $pack_num . ' tidak berstatus Open (status: ' . $ship_head->ShipStatus . ')']);
+        $ship_status = strtolower(trim((string) $ship_head->ShipStatus));
+        if (!in_array($ship_status, ['open', 'close', 'closed'], true)) {
+            echo json_encode(['status' => 0, 'message' => 'Surat jalan ' . $pack_num . ' harus berstatus Open atau Closed (status: ' . $ship_head->ShipStatus . ')']);
             return;
         }
 
@@ -397,41 +492,6 @@ class MasterPackShipmentController extends Controller
         }
         if (MasterPackShipment::check_pack_num_globally($pack_num, $doc_id) > 0) {
             echo json_encode(['status' => 0, 'message' => 'PackNum ' . $pack_num . ' sudah digunakan di packing list lain']);
-            return;
-        }
-
-        // ── Call ERP API: Shipment/Shipped ───────────────────────────────────
-        try {
-            $client   = new Client();
-            $password = Crypt::decryptString(Auth::user()->epicor_password) ;  
-            $api_resp = $client->request('POST', self::get_host_api() . 'Shipment/Shipped', [
-                'json' => [
-                    'packNum'        => $pack_num,
-                    'readyToInvoice' => true,
-                    'nik'            => Auth::user()->username,
-                    'password'       => $password,
-                ],
-                'headers' => ['Content-Type' => 'application/json'],
-                'verify'  => false,
-                'timeout' => 30,
-            ]);
-            $api_body = json_decode((string) $api_resp->getBody(), true);
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            $err_desc = null;
-            if ($e->hasResponse()) {
-                $err_json = json_decode((string) $e->getResponse()->getBody(), true);
-                $err_desc = $err_json['desc'] ?? null;
-            }
-            echo json_encode(['status' => 0, 'message' => 'Gagal menghubungi API: ' . ($err_desc ?? $e->getMessage())]);
-            return;
-        } catch (\Exception $e) {
-            echo json_encode(['status' => 0, 'message' => 'Gagal menghubungi API: ' . $e->getMessage()]);
-            return;
-        }
-
-        if (empty($api_body) || ($api_body['code'] ?? 0) != 200) {
-            $desc = $api_body['desc'] ?? 'Gagal memproses pengiriman di Epicor';
-            echo json_encode(['status' => 0, 'message' => $desc]);
             return;
         }
 
@@ -464,6 +524,208 @@ class MasterPackShipmentController extends Controller
         ]);
     }
 
+    // ─── Scan Packing List: trigger Shipment/Shipped massal ─────────────────
+
+    public function scan_packing_list_shipment(Request $request)
+    {
+        $packing_list_num = trim(strip_tags((string) $request->packing_list_num));
+
+        if ($packing_list_num === '') {
+            echo json_encode(['status' => 0, 'message' => 'Packing List No. wajib diisi']);
+            return;
+        }
+
+        $header = DB::table('MasterPackShipments')
+            ->whereNull('DeletedAt')
+            ->where('PackingListNum', $packing_list_num)
+            ->first();
+
+        if (!$header) {
+            echo json_encode(['status' => 0, 'message' => 'Packing List tidak ditemukan: ' . $packing_list_num]);
+            return;
+        }
+        if (!$header->PackingListNum) {
+            echo json_encode(['status' => 0, 'message' => 'Packing List masih Draft dan belum bisa diproses Shipment/Shipped']);
+            return;
+        }
+
+        $details = DB::table('DtlPackShipment')
+            ->where('MasterPackID', $header->id)
+            ->select('PackNum', 'LegalNumber')
+            ->get();
+
+        if ($details->isEmpty()) {
+            echo json_encode(['status' => 0, 'message' => 'Packing List tidak memiliki detail surat jalan']);
+            return;
+        }
+
+        $success = [];
+        $failed  = [];
+        $pack_nums = $details->pluck('PackNum')->filter()->unique()->values()->all();
+
+        try {
+            $ship_heads = DB::connection('sqlsrv4')
+                ->table('ShipHead')
+                ->whereIn('PackNum', $pack_nums)
+                ->select('PackNum', 'ShipStatus')
+                ->get()
+                ->keyBy('PackNum');
+        } catch (\Exception $e) {
+            echo json_encode(['status' => 0, 'message' => 'Gagal validasi status surat jalan di Epicor: ' . $e->getMessage()]);
+            return;
+        }
+
+        $eligible_pack_nums = [];
+        $invalid_pack_nums = [];
+
+        foreach ($pack_nums as $pack_num) {
+            $status = strtolower(trim((string) optional($ship_heads->get($pack_num))->ShipStatus));
+            if (in_array($status, ['open', 'close', 'closed'], true)) {
+                $eligible_pack_nums[] = $pack_num;
+            } else {
+                $invalid_pack_nums[] = [
+                    'pack_num' => $pack_num,
+                    'status'   => $status ?: '-',
+                ];
+            }
+        }
+
+        if (count($eligible_pack_nums) === 0) {
+            echo json_encode([
+                'status'           => 0,
+                'message'          => 'Packing List ' . $packing_list_num . ' tidak memiliki surat jalan yang bisa diproses.',
+                'packing_list_num' => $packing_list_num,
+                'invalid_count'    => count($invalid_pack_nums),
+            ]);
+            return;
+        }
+
+        foreach ($eligible_pack_nums as $pack_num) {
+            $result = $this->call_shipment_shipped($pack_num, true);
+
+            if ($result['ok']) {
+                $success[] = $pack_num;
+            } else {
+                $failed[] = [
+                    'pack_num' => $pack_num,
+                    'error'    => $result['error'],
+                ];
+            }
+        }
+
+        if (count($failed) > 0) {
+            $first_error = $failed[0]['error'] ?? 'Terjadi kesalahan saat proses Shipment/Shipped';
+            echo json_encode([
+                'status'           => 2,
+                'message'          => 'Proses selesai parsial. Berhasil: ' . count($success) . ', gagal: ' . count($failed) . ', tidak eligible: ' . count($invalid_pack_nums) . '. Error pertama: ' . $first_error,
+                'packing_list_num' => $packing_list_num,
+                'success_count'    => count($success),
+                'failed_count'     => count($failed),
+                'invalid_count'    => count($invalid_pack_nums),
+                'failed'           => $failed,
+            ]);
+            return;
+        }
+
+        MasterPackShipment::update_header($header->id, [
+            'ShippedAt' => now(),
+            'ShippedBy' => Auth::user()->username,
+            'UpdatedAt' => now(),
+            'UpdatedBy' => Auth::user()->username,
+        ]);
+
+        echo json_encode([
+            'status'           => 1,
+            'message'          => 'Shipment/Shipped berhasil untuk ' . count($success) . ' surat jalan pada Packing List ' . $packing_list_num,
+            'packing_list_num' => $packing_list_num,
+            'success_count'    => count($success),
+            'failed_count'     => 0,
+            'invalid_count'    => count($invalid_pack_nums),
+        ]);
+    }
+
+    // ─── Cancel Shipment by Packing List: readyToInvoice=false (massal) ─────
+
+    public function cancel_packing_list_shipment(Request $request)
+    {
+        $packing_list_num = trim(strip_tags((string) $request->packing_list_num));
+
+        if ($packing_list_num === '') {
+            echo json_encode(['status' => 0, 'message' => 'Packing List No. wajib diisi']);
+            return;
+        }
+
+        $header = DB::table('MasterPackShipments')
+            ->whereNull('DeletedAt')
+            ->where('PackingListNum', $packing_list_num)
+            ->first();
+
+        if (!$header) {
+            echo json_encode(['status' => 0, 'message' => 'Packing List tidak ditemukan: ' . $packing_list_num]);
+            return;
+        }
+
+        if (!$header->ShippedAt) {
+            echo json_encode(['status' => 0, 'message' => 'Packing List belum berstatus Shipped']);
+            return;
+        }
+
+        $details = DB::table('DtlPackShipment')
+            ->where('MasterPackID', $header->id)
+            ->select('PackNum')
+            ->get();
+
+        if ($details->isEmpty()) {
+            echo json_encode(['status' => 0, 'message' => 'Packing List tidak memiliki detail surat jalan']);
+            return;
+        }
+
+        $success = [];
+        $failed = [];
+        $pack_nums = $details->pluck('PackNum')->filter()->unique()->values()->all();
+
+        foreach ($pack_nums as $pack_num) {
+            $result = $this->call_shipment_shipped($pack_num, false);
+
+            if ($result['ok']) {
+                $success[] = $pack_num;
+            } else {
+                $failed[] = [
+                    'pack_num' => $pack_num,
+                    'error'    => $result['error'],
+                ];
+            }
+        }
+
+        if (count($failed) > 0) {
+            $first_error = $failed[0]['error'] ?? 'Terjadi kesalahan saat cancel shipment';
+            echo json_encode([
+                'status'           => 2,
+                'message'          => 'Cancel shipment selesai parsial. Berhasil: ' . count($success) . ', gagal: ' . count($failed) . '. Error pertama: ' . $first_error,
+                'packing_list_num' => $packing_list_num,
+                'success_count'    => count($success),
+                'failed_count'     => count($failed),
+                'failed'           => $failed,
+            ]);
+            return;
+        }
+
+        MasterPackShipment::update_header($header->id, [
+            'ShippedAt' => null,
+            'ShippedBy' => null,
+            'UpdatedAt' => now(),
+            'UpdatedBy' => Auth::user()->username,
+        ]);
+
+        echo json_encode([
+            'status'           => 1,
+            'message'          => 'Cancel shipment berhasil untuk ' . count($success) . ' surat jalan pada Packing List ' . $packing_list_num,
+            'packing_list_num' => $packing_list_num,
+            'success_count'    => count($success),
+            'failed_count'     => 0,
+        ]);
+    }
+
     // ─── Delete a single detail row ───────────────────────────────────────────
 
     public function delete_detail(Request $request)
@@ -481,41 +743,6 @@ class MasterPackShipmentController extends Controller
         $detail = DB::table('DtlPackShipment')->where('id', $detail_id)->first();
         if (!$detail) {
             echo json_encode(['status' => 0, 'message' => 'Item tidak ditemukan']);
-            return;
-        }
-
-        // ── Call ERP API: Shipment/Shipped (readyToInvoice=false) ────────────
-        try {
-            $client   = new Client();
-            $password = Crypt::decryptString(Auth::user()->epicor_password);
-            $api_resp = $client->request('POST', self::get_host_api() . 'Shipment/Shipped', [
-                'json' => [
-                    'packNum'        => (int) $detail->PackNum,
-                    'readyToInvoice' => false,
-                    'nik'            => Auth::user()->username,
-                    'password'       => $password,
-                ],
-                'headers' => ['Content-Type' => 'application/json'],
-                'verify'  => false,
-                'timeout' => 30,
-            ]);
-            $api_body = json_decode((string) $api_resp->getBody(), true);
-        } catch (\GuzzleHttp\Exception\RequestException $e) {
-            $err_desc = null;
-            if ($e->hasResponse()) {
-                $err_json = json_decode((string) $e->getResponse()->getBody(), true);
-                $err_desc = $err_json['desc'] ?? null;
-            }
-            echo json_encode(['status' => 0, 'message' => 'Gagal menghubungi API: ' . ($err_desc ?? $e->getMessage())]);
-            return;
-        } catch (\Exception $e) {
-            echo json_encode(['status' => 0, 'message' => 'Gagal menghubungi API: ' . $e->getMessage()]);
-            return;
-        }
-
-        if (empty($api_body) || ($api_body['code'] ?? 0) != 200) {
-            $desc = $api_body['desc'] ?? 'Gagal membatalkan pengiriman di Epicor';
-            echo json_encode(['status' => 0, 'message' => $desc]);
             return;
         }
 
@@ -697,7 +924,6 @@ $style = array(
                 . '</td>'
                 . '</tr>'
                 . '</table>'
-                
                 ;
 
             $pdf->writeHTMLCell(190, 0, 10, 5, $headerHtml, 0, 1);
